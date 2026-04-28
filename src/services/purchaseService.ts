@@ -1,4 +1,4 @@
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   collection, 
   doc, 
@@ -8,20 +8,6 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { Compra, DetalleCompra, Caja } from '../types';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  console.error('Firestore Error: ', error);
-  throw error;
-}
 
 export const createPurchaseTransaction = async (
   compraData: Omit<Compra, 'id'>,

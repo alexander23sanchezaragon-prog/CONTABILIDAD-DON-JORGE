@@ -1,4 +1,4 @@
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   collection, 
   doc, 
@@ -7,27 +7,6 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { Venta, DetalleVenta, Caja } from '../types';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: any;
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  console.error('Firestore Error: ', error);
-  throw error;
-}
 
 export const createSaleTransaction = async (
   ventaData: Omit<Venta, 'id'>,

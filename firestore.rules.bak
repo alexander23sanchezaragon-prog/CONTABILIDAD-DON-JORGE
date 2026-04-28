@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny for everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'alex.b19h@gmail.com' ||
+        request.auth.token.email == 'alexander23sanchezaragon@gmail.com'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // Validation Blueprints
+    function isValidProducto(data) {
+      return data.nombre is string && data.nombre.size() > 0 &&
+             data.unidad in ['kg', 'unidad'] &&
+             data.precio is number &&
+             data.costo is number &&
+             data.tipo in ['normal', 'produccion'];
+    }
+
+    // Empresa
+    match /empresa/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Productos
+    match /productos/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidProducto(incoming()) && (
+        incoming().keys().hasAll(['nombre', 'unidad', 'precio', 'costo', 'tipo', 'stock']) &&
+        incoming().keys().size() == 6
+      );
+      allow update: if isSignedIn() && (
+        // Allow stock/cost updates from transactions
+        incoming().diff(existing()).affectedKeys().hasAny(['stock', 'costo', 'precio', 'nombre', 'unidad', 'tipo'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Proveedores
+    match /proveedores/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Compras
+    match /compras/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /detalle_compras/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Ventas
+    match /ventas/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /detalle_ventas/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Caja
+    match /caja/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Ajustes Inventario
+    match /ajustes_inventario/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+
+    // Empleados
+    match /empleados/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Pagos Empleados
+    match /pagos_empleados/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Abonos
+    match /abonos_compras/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+    match /abonos_ventas/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+  }
+}

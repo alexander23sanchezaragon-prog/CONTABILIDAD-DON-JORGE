@@ -1,4 +1,4 @@
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   collection, 
   doc, 
@@ -11,24 +11,28 @@ import { AjusteInventario } from '../types';
 export const adjustStockTransaction = async (
   ajusteData: Omit<AjusteInventario, 'id'>
 ) => {
-  return runTransaction(db, async (transaction) => {
-    // 1. Get current product
-    const productRef = doc(db, 'productos', ajusteData.productoId);
-    const productSnap = await transaction.get(productRef);
-    if (!productSnap.exists()) throw new Error("Producto no encontrado");
-    
-    // 2. Register adjustment
-    const adjustmentRef = doc(collection(db, 'ajustes_inventario'));
-    transaction.set(adjustmentRef, {
-      ...ajusteData,
-      fecha: Timestamp.now()
-    });
+  try {
+    return await runTransaction(db, async (transaction) => {
+      // 1. Get current product
+      const productRef = doc(db, 'productos', ajusteData.productoId);
+      const productSnap = await transaction.get(productRef);
+      if (!productSnap.exists()) throw new Error("Producto no encontrado");
+      
+      // 2. Register adjustment
+      const adjustmentRef = doc(collection(db, 'ajustes_inventario'));
+      transaction.set(adjustmentRef, {
+        ...ajusteData,
+        fecha: Timestamp.now()
+      });
 
-    // 3. Update stock
-    transaction.update(productRef, {
-      stock: ajusteData.cantidadNueva
-    });
+      // 3. Update stock
+      transaction.update(productRef, {
+        stock: ajusteData.cantidadNueva
+      });
 
-    return adjustmentRef.id;
-  });
+      return adjustmentRef.id;
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'ajustes_inventario');
+  }
 };
