@@ -1,0 +1,155 @@
+{
+  "entities": {
+    "empresa": {
+      "title": "Empresa",
+      "description": "Información de la empresa",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "nit": { "type": "string" },
+        "direccion": { "type": "string" },
+        "telefono": { "type": "string" },
+        "correo": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "consecutivoCompra": { "type": "number" },
+        "consecutivoVenta": { "type": "number" }
+      }
+    },
+    "producto": {
+      "title": "Producto",
+      "description": "Productos disponibles",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "unidad": { "type": "string", "enum": ["kg", "unidad"] },
+        "precio": { "type": "number" },
+        "costo": { "type": "number" },
+        "tipo": { "type": "string", "enum": ["normal", "produccion"] },
+        "stock": { "type": "number" }
+      },
+      "required": ["nombre", "unidad", "precio", "costo", "tipo"]
+    },
+    "proveedor": {
+      "title": "Proveedor",
+      "description": "Proveedores de alimentos",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "contacto": { "type": "string" },
+        "telefono": { "type": "string" },
+        "saldoPendiente": { "type": "number" }
+      },
+      "required": ["nombre"]
+    },
+    "compra": {
+      "title": "Compra",
+      "description": "Factura de compra a proveedores",
+      "type": "object",
+      "properties": {
+        "numeroFactura": { "type": "string" },
+        "fecha": { "type": "string", "format": "date-time" },
+        "proveedorId": { "type": "string" },
+        "total": { "type": "number" },
+        "tipoPago": { "type": "string", "enum": ["contado", "credito"] },
+        "saldoPendiente": { "type": "number" },
+        "estado": { "type": "string", "enum": ["pagada", "pendiente"] }
+      }
+    },
+    "detalle_compra": {
+      "title": "Detalle Compra",
+      "description": "Items individuales de una compra",
+      "type": "object",
+      "properties": {
+        "compraId": { "type": "string" },
+        "productoId": { "type": "string" },
+        "cantidad": { "type": "number" },
+        "precioUnitario": { "type": "number" },
+        "total": { "type": "number" }
+      }
+    },
+    "venta": {
+      "title": "Venta",
+      "description": "Factura de venta a clientes",
+      "type": "object",
+      "properties": {
+        "numeroFactura": { "type": "string" },
+        "fecha": { "type": "string", "format": "date-time" },
+        "clienteNombre": { "type": "string" },
+        "total": { "type": "number" },
+        "tipoPago": { "type": "string", "enum": ["contado", "credito"] },
+        "saldoPendiente": { "type": "number" },
+        "estado": { "type": "string", "enum": ["pagada", "pendiente"] }
+      }
+    },
+    "detalle_venta": {
+      "title": "Detalle Venta",
+      "description": "Items individuales de una venta",
+      "type": "object",
+      "properties": {
+        "ventaId": { "type": "string" },
+        "productoId": { "type": "string" },
+        "cantidad": { "type": "number" },
+        "precioUnitario": { "type": "number" },
+        "total": { "type": "number" }
+      }
+    },
+    "caja": {
+      "title": "Caja",
+      "description": "Movimientos de dinero",
+      "type": "object",
+      "properties": {
+        "fecha": { "type": "string", "format": "date-time" },
+        "tipo": { "type": "string", "enum": ["entrada", "salida"] },
+        "monto": { "type": "number" },
+        "concepto": { "type": "string" },
+        "referenciaId": { "type": "string" }
+      }
+    },
+    "ajuste_inventario": {
+      "title": "Ajuste de Inventario",
+      "description": "Correcciones manuales de stock",
+      "type": "object",
+      "properties": {
+        "fecha": { "type": "string", "format": "date-time" },
+        "productoId": { "type": "string" },
+        "cantidadAnterior": { "type": "number" },
+        "cantidadNueva": { "type": "number" },
+        "motivo": { "type": "string" },
+        "adminId": { "type": "string" }
+      }
+    },
+    "abono_compra": {
+      "title": "Abono Compra",
+      "description": "Pagos parciales a una compra a crédito",
+      "type": "object",
+      "properties": {
+        "fecha": { "type": "string", "format": "date-time" },
+        "compraId": { "type": "string" },
+        "monto": { "type": "number" }
+      }
+    },
+    "abono_venta": {
+      "title": "Abono Venta",
+      "description": "Pagos parciales de una venta a crédito",
+      "type": "object",
+      "properties": {
+        "fecha": { "type": "string", "format": "date-time" },
+        "ventaId": { "type": "string" },
+        "monto": { "type": "number" }
+      }
+    }
+  },
+  "firestore": {
+    "empresa": { "schema": "empresa", "description": "Datos de la empresa y configuración" },
+    "productos": { "schema": "producto", "description": "Catálogo de productos" },
+    "proveedores": { "schema": "proveedor", "description": "Lista de proveedores" },
+    "compras": { "schema": "compra", "description": "Registros de compras" },
+    "detalle_compras": { "schema": "detalle_compra", "description": "Detalles de cada compra" },
+    "ventas": { "schema": "venta", "description": "Registros de ventas" },
+    "detalle_ventas": { "schema": "detalle_venta", "description": "Detalles de cada venta" },
+    "caja": { "schema": "caja", "description": "Historial de caja" },
+    "ajustes_inventario": { "schema": "ajuste_inventario", "description": "Historial de ajustes manuales" },
+    "abonos_compras": { "schema": "abono_compra", "description": "Abonos realizados a proveedores" },
+    "abonos_ventas": { "schema": "abono_venta", "description": "Abonos recibidos de clientes" }
+  }
+}
