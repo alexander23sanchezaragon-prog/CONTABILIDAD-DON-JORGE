@@ -1,178 +1,161 @@
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { 
-  collection, 
-  doc, 
-  runTransaction, 
-  increment, 
-  Timestamp
-} from 'firebase/firestore';
-import { Venta, DetalleVenta, Caja } from '../types';
+import { db } from '../lib/firebase';
+import { collection, doc, runTransaction, increment, Timestamp } from 'firebase/firestore';
 
+// CREAR VENTA
+export const createSaleTransaction = async (ventaData, detalles, montoPagado) => {
+  return await runTransaction(db, async (transaction) => {
 
-// ===============================
-// 🟢 CREAR VENTA (CON DESCUENTO)
-// ===============================
-export const createSaleTransaction = async (
-  ventaData: Omit<Venta, 'id'>,
-  detalles: Omit<DetalleVenta, 'id' | 'ventaId'>[],
-  montoPagado: number
-) => {
-  try {
-    return await runTransaction(db, async (transaction) => {
+    const empresaRef = doc(db, 'empresa', 'config');
+    const empresaSnap = await transaction.get(empresaRef);
 
-      // 🔹 1. LECTURAS
-      const empresaRef = doc(db, 'empresa', 'config');
-      const empresaSnap = await transaction.get(empresaRef);
+    let consecutivo = empresaSnap.exists()
+      ? empresaSnap.data().consecutivoVenta || 1
+      : 1;
 
-      let nextConsecutive = 1;
-      if (empresaSnap.exists()) {
-        nextConsecutive = empresaSnap.data().consecutivoVenta || 1;
-      }
+    const numeroFactura = `VENT-${String(consecutivo).padStart(4, '0')}`;
 
-      const productosData = [];
-      for (const item of detalles) {
-        const productRef = doc(db, 'productos', item.productoId);
-        const productSnap = await transaction.get(productRef);
+    const totalOriginal = ventaData.total;
+    const descuento = ventaData.descuento || 0;
+    const totalFinal = totalOriginal - descuento;
 
-        if (!productSnap.exists()) {
-          throw new Error(`Producto ${item.productoId} no encontrado`);
-        }
+    if (totalFinal < 0) throw new Error("Descuento inválido");
 
-        const currentStock = productSnap.data().stock || 0;
+    const saleRef = doc(collection(db, 'ventas'));
 
-        if (currentStock < item.cantidad) {
-          throw new Error(
-            `Stock insuficiente para ${item.productoNombre}. Disponible: ${currentStock}`
-          );
-        }
-
-        productosData.push({
-          ref: productRef,
-          cantidad: item.cantidad
-        });
-      }
-
-      // 🔹 2. CÁLCULOS
-      const numeroFactura = `VENT-${nextConsecutive.toString().padStart(4, '0')}`;
-
-      const totalOriginal = ventaData.total;
-      const descuento = ventaData.descuento || 0;
-      const totalFinal = totalOriginal - descuento;
-
-      if (totalFinal < 0) {
-        throw new Error('El descuento no puede ser mayor al total');
-      }
-
-      // 🔹 3. CREAR VENTA
-      const saleRef = doc(collection(db, 'ventas'));
-      const finalVentaData = {
-        ...ventaData,
-        numeroFactura,
-        fecha: Timestamp.fromDate(new Date(ventaData.fecha)),
-        totalOriginal,
-        descuento,
-        totalFinal
-      };
-
-      transaction.set(saleRef, finalVentaData);
-
-      // 🔹 4. DETALLES
-      for (const item of detalles) {
-        const detailRef = doc(collection(db, 'detalle_ventas'));
-        transaction.set(detailRef, {
-          ...item,
-          ventaId: saleRef.id
-        });
-      }
-
-      // 🔹 5. STOCK
-      for (const prod of productosData) {
-        transaction.update(prod.ref, {
-          stock: increment(-prod.cantidad)
-        });
-      }
-
-      // 🔹 6. CAJA
-      if (montoPagado > 0) {
-        const cajaRef = doc(collection(db, 'caja'));
-        const concepto = ventaData.tipoPago === 'contado' 
-          ? `Venta de contado ${numeroFactura}` 
-          : `Abono inicial venta ${numeroFactura}`;
-          
-        const cajaMov: Omit<Caja, 'id'> = {
-          fecha: Timestamp.now(),
-          tipo: 'entrada',
-          monto: montoPagado,
-          concepto,
-          referenciaId: saleRef.id
-        };
-
-        transaction.set(cajaRef, cajaMov);
-      }
-
-      // 🔹 7. CONSECUTIVO
-      transaction.set(empresaRef, {
-        consecutivoVenta: nextConsecutive + 1
-      }, { merge: true });
-
-      return { id: saleRef.id, numeroFactura };
+    transaction.set(saleRef, {
+      ...ventaData,
+      numeroFactura,
+      fecha: Timestamp.now(),
+      totalOriginal,
+      descuento,
+      totalFinal
     });
 
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'ventas');
-    throw error;
-  }
+    transaction.set(empresaRef, {
+      consecutivoVenta: consecutivo + 1
+    }, { merge: true });
+
+    return { id: saleRef.id };
+  });
 };
 
+// DESCUENTO DESPUÉS
+export const applyDiscountToSale = async (ventaId, nuevoDescuento) => {
+  return await runTransaction(db, async (transaction) => {
 
-// =======================================
-// 🟡 APLICAR DESCUENTO DESPUÉS DE LA VENTA
-// =======================================
-export const applyDiscountToSale = async (
-  ventaId,
-  nuevoDescuento
-) => {
-  try {
-    return await runTransaction(db, async (transaction) => {
+    const ref = doc(db, 'ventas', ventaId);
+    const snap = await transaction.get(ref);
 
-      // 🔹 1. LEER VENTA
-      const ventaRef = doc(db, 'ventas', ventaId);
-      const ventaSnap = await transaction.get(ventaRef);
+    if (!snap.exists()) throw new Error("Venta no existe");
 
-      if (!ventaSnap.exists()) {
-        throw new Error('Venta no encontrada');
-      }
+    const venta = snap.data();
 
-      const venta = ventaSnap.data();
+    const totalOriginal = venta.totalOriginal || venta.total;
+    const totalFinal = totalOriginal - nuevoDescuento;
 
-      const totalOriginal = venta.totalOriginal || venta.total;
-      const descuentoAnterior = venta.descuento || 0;
-      const totalFinal = totalOriginal - nuevoDescuento;
+    if (totalFinal < 0) throw new Error("Descuento inválido");
 
-      if (totalFinal < 0) {
-        throw new Error('El descuento no puede ser mayor al total');
-      }
-
-      // 🔹 2. ACTUALIZAR VENTA
-      transaction.update(ventaRef, {
-        descuento: nuevoDescuento,
-        totalFinal
-      });
-
-      // 🔹 3. HISTORIAL (PRO)
-      const historialRef = doc(collection(db, 'historial_descuentos'));
-      transaction.set(historialRef, {
-        ventaId,
-        descuentoAnterior,
-        descuentoNuevo: nuevoDescuento,
-        fecha: Timestamp.now()
-      });
-
-      return true;
+    transaction.update(ref, {
+      descuento: nuevoDescuento,
+      totalFinal
     });
-
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'ventas');
-    throw error;
-  }
+  });
 };
+import { useState } from "react";
+import { createSaleTransaction } from "../services/ventas";
+
+export default function VentaForm() {
+
+  const [total, setTotal] = useState(0);
+  const [descuento, setDescuento] = useState(0);
+
+  const guardar = async () => {
+    await createSaleTransaction(
+      { total, descuento, tipoPago: "contado" },
+      [],
+      total - descuento
+    );
+
+    alert("Venta guardada");
+  };
+
+  return (
+    <div>
+      <h2>Crear venta</h2>
+
+      <input
+        type="number"
+        placeholder="Total"
+        onChange={e => setTotal(Number(e.target.value))}
+      />
+
+      <input
+        type="number"
+        placeholder="Descuento"
+        onChange={e => setDescuento(Number(e.target.value))}
+      />
+
+      <p>Total final: {total - descuento}</p>
+
+      <button onClick={guardar}>
+        Guardar
+      </button>
+    </div>
+  );
+}
+import { useEffect, useState } from "react";
+import { db } from "../lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { applyDiscountToSale } from "../services/ventas";
+
+export default function VentasList() {
+
+  const [ventas, setVentas] = useState([]);
+
+  const cargar = async () => {
+    const snap = await getDocs(collection(db, "ventas"));
+    setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  };
+
+  useEffect(() => {
+    cargar();
+  }, []);
+
+  const cambiar = async (id) => {
+    const val = prompt("Nuevo descuento:");
+    if (!val) return;
+
+    await applyDiscountToSale(id, Number(val));
+    cargar();
+  };
+
+  return (
+    <div>
+      <h2>Ventas</h2>
+
+      {ventas.map(v => (
+        <div key={v.id}>
+          <p>{v.numeroFactura}</p>
+          <p>Total: {v.totalOriginal}</p>
+          <p>Descuento: {v.descuento}</p>
+          <p>Total final: {v.totalFinal}</p>
+
+          <button onClick={() => cambiar(v.id)}>
+            Editar descuento
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+import VentaForm from "./components/VentaForm";
+import VentasList from "./components/VentasList";
+
+export default function App() {
+  return (
+    <div>
+      <VentaForm />
+      <VentasList />
+    </div>
+  );
+}
