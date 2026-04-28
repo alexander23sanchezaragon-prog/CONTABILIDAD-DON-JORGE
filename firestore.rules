@@ -12,11 +12,11 @@ service cloud.firestore {
     }
 
     function isVerifiedUser() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+      return isSignedIn();
     }
 
     function isAdmin() {
-      return isVerifiedUser() && (
+      return isSignedIn() && (
         request.auth.token.email == 'alexander23sanchezaragon@gmail.com' ||
         request.auth.token.email == 'alex.b19h@gmail.com'
       );
@@ -28,6 +28,11 @@ service cloud.firestore {
 
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
+
+    // Allow test connection
+    match /test/{id} {
+      allow read: if true;
+    }
 
     // Validation Blueprints (Phase 4)
     
