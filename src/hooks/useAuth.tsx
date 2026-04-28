@@ -20,9 +20,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
 
-  const isAdmin = user?.email === 'alex.b19h@gmail.com' || user?.email === 'alexander23sanchezaragon@gmail.com';
+  const isAdmin = user?.email?.toLowerCase().trim() === 'alex.b19h@gmail.com' || user?.email?.toLowerCase().trim() === 'alexander23sanchezaragon@gmail.com';
 
   const fetchEmpresa = async () => {
+    if (!user) return;
     try {
       const empresaDoc = await getDoc(doc(db, 'empresa', 'config'));
       if (empresaDoc.exists()) {
@@ -38,8 +39,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           consecutivoCompra: 1,
           consecutivoVenta: 1,
         };
-        await setDoc(doc(db, 'empresa', 'config'), initialEmpresa);
-        setEmpresa(initialEmpresa);
+        try {
+          await setDoc(doc(db, 'empresa', 'config'), initialEmpresa);
+          setEmpresa(initialEmpresa);
+        } catch (setErr: any) {
+          console.error('Error creating initial empresa:', setErr.message);
+        }
       }
     } catch (error: any) {
       console.warn('Error fetching empresa:', error.message);

@@ -68,6 +68,11 @@ export const createPurchaseTransaction = async (
       const cantidad = Number(item.cantidad) || 0;
       const costo = Number(item.precioUnitario) || 0;
 
+      if (isNaN(cantidad) || isNaN(costo)) {
+        console.error('Invalid amount or cost in purchase detail:', item);
+        continue;
+      }
+
       transaction.update(productRef, {
         stock: increment(cantidad),
         costo: costo // Update cost to last purchase cost
@@ -78,8 +83,9 @@ export const createPurchaseTransaction = async (
     if (compraData.tipoPago === 'credito') {
       const providerRef = doc(db, 'proveedores', compraData.proveedorId);
       // Saldo pendiente is Total - Abono
+      const saldoPendiente = Number(compraData.saldoPendiente) || 0;
       transaction.update(providerRef, {
-        saldoPendiente: increment(compraData.saldoPendiente)
+        saldoPendiente: increment(saldoPendiente)
       });
     }
 

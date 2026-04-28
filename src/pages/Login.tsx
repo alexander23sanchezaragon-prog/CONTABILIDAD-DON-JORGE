@@ -46,7 +46,13 @@ const Login = () => {
       await signInWithPopup(auth, provider);
       navigate('/');
     } catch (err: any) {
-      setError('Error al iniciar sesión con Google.');
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('La ventana de acceso fue cerrada. Por favor intente de nuevo.');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        setError('Solicitud cancelada. Solo puede haber una ventana de acceso abierta.');
+      } else {
+        setError('Error al iniciar sesión con Google: ' + (err.message || 'Error desconocido'));
+      }
       console.error(err);
     } finally {
       setLoading(false);
